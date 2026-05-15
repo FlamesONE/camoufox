@@ -23,7 +23,7 @@ Camoufox is an open source browser built for AI agents. It is lightweight, mimic
 > **All of the latest documentation is avaliable at [camoufox.com](https://camoufox.com).**
 
 > [!NOTE]
-> Browser development is active at [github.com/CloverLabsAI/camoufox](https://github.com/CloverLabsAI/camoufox) and [github.com/VulpineOS/VulpineOS](https://github.com/VulpineOS/VulpineOS).<br>This repo is being used to merge checkpoint releases.
+> Browser development is active at [github.com/CloverLabsAI/camoufox](https://github.com/CloverLabsAI/camoufox) and [github.com/VulpineOS/VulpineOS](https://github.com/VulpineOS/VulpineOS).<br>This repo is being used to merge checkpoint releases and should be used as the source of truth.
 
 > [!NOTE]
 > To make use of the alpha Camoufox releases, use the [`cloverlabs-camoufox`](https://pypi.org/project/cloverlabs-camoufox/) pip package.
