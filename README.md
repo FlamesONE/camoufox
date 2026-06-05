@@ -191,6 +191,16 @@ Camoufox is intended to be used with rotating proxies (preferably residential IP
       Use code DAIJRO for 8% OFF ISP Static Proxies
     </td>
   </tr>
+  <tr>
+    <td width="25%" align="center" valign="middle">
+      <a href="https://9proxy.com/pricing?utm_source=github&utm_medium=daijro&utm_campaign=githubdev&utm_content=sponsored" target="_blank">
+        <img width="380" alt="mangoproxy" src="https://github.com/user-attachments/assets/2b59c5d9-317a-488d-a723-134b7237d339"/>
+      </a>
+    </td>
+    <td valign="middle">
+      <a href="https://9proxy.com/pricing?utm_source=github&utm_medium=daijro&utm_campaign=githubdev&utm_content=sponsored">9Proxy</a> provides residential proxies from just $0.018/IP or $0.68/GB. 20M+ IPs across 90+ countries. Sticky or rotating sessions, managed from desktop or mobile app.<br>
+    </td>
+  </tr>
 </table>
 </details>
 
@@ -198,7 +208,7 @@ Camoufox is intended to be used with rotating proxies (preferably residential IP
 
 # Introduction
 
-Camoufox is a Firefox fork engineered for AI agents. It is headless, undetectable, and optimized to run at scale. With stealth features as the foundation, it gives your AI agent a browser that just works: no bot walls, no fingerprint leaks, no wasted tokens\* parsing bloated DOM.
+Camoufox is a Firefox fork engineered for web scraping and AI agents. It is headless, undetectable, and optimized to run at scale. Every run gets a fresh identity drawn from the real-world distribution of devices, so it blends into normal traffic instead of standing out.
 
 ## Highlights
 
