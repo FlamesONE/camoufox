@@ -96,21 +96,6 @@ Camoufox is intended to be used with rotating proxies (preferably residential IP
 <table>
   <tr>
     <td width="25%" align="center" valign="middle">
-      <a href="https://www.thordata.com/?ls=github&lk=camoufox" target="_blank">
-        <img alt="thordata" src="https://github.com/user-attachments/assets/fa79fe26-633b-44a4-a2a8-bce570f180ca" width="350"/>
-      </a>
-    </td>
-    <td valign="middle">
-      <a href="https://www.thordata.com/?ls=github&lk=camoufox">Thordata</a> - Your First Plan is on Us! 💰 Get 100% of your first residential proxy purchase back as wallet balance, up to $900.<br><br>
-      <b>⚡ Why Thordata?</b><br>
-      • 🌍 190+ real residential & ISP IP locations<br>
-      • 🔐 Fully encrypted, ultra-secure connections<br>
-      • 🚀 Optimized for web scraping, ad verification & automation workflows<br>
-      🔥 Don't wait - this is your <b>best time to start</b> with <a href="https://www.thordata.com/?ls=github&lk=camoufox">Thordata</a> and experience the safest, fastest proxy network.
-    </td>
-  </tr>
-  <tr>
-    <td width="25%" align="center" valign="middle">
       <a href="https://proxyempire.io/?ref=camoufox&utm_source=camoufox" target="_blank">
         <img width="380" alt="proxyempire" src="https://github.com/user-attachments/assets/d1c5f849-5cb0-4aff-b48c-530bda2ee03f"/>
       </a>
@@ -140,27 +125,6 @@ Camoufox is intended to be used with rotating proxies (preferably residential IP
       Hey, we built BirdProxies because proxies shouldn't be complicated or overpriced. Fast residential and ISP proxies in 195+ locations, fair pricing, and real support.<br>
       Try our FlappyBird game on the landing page for free data!<br>
       <a href="https://birdproxies.com/t/camoufox">Try Now</a> | <a href="https://discord.com/invite/birdproxies">Discord</a>
-    </td>
-  </tr>
-  <tr>
-    <td width="25%" align="center" valign="middle">
-      <a href="https://proxy-seller.com/?partner=1W5MMSYEXKKTUK" target="_blank">
-        <img width="380" alt="birdproxies" src="https://github.com/user-attachments/assets/d2771913-e2c1-453f-a258-4789139a841c"/>
-      </a>
-    </td>
-    <td valign="middle">
-      <a href="https://proxy-seller.com/?partner=1W5MMSYEXKKTUK">
-        <a href="https://proxy-seller.com/?partner=1W5MMSYEXKKTUK">Proxy-Seller</a> - Premium Proxies for AI Agents, Scraping & Automation 🎁 Use code <strong>CAMOUFOX for 15% OFF</strong> IPv4, IPv6, ISP & Residential proxies + 10% OFF Mobile<br>
-        <strong>Why Choose Proxy-Seller?</strong><br>
-        • 🌍 40M+ IPs across 220+ countries with city/ISP-level targeting<br>
-        • 📶 Residential, ISP, Datacenter (IPv4/IPv6) & 4G/5G Mobile proxies<br>
-        • ⚡ Up to 1 Gbps speed with 99% uptime<br>
-        • 🔄 Flexible rotation — time-based, request-based, or sticky sessions<br>
-        • 🛠️ Ready-made API for Python, Node.js, PHP, Java & Golang<br>
-        • 🔒 SOCKS5 & HTTP(S) with login/pass or IP whitelisting<br>
-        • 🎭 Perfect pairing with Camoufox for stealth automation<br>
-        • 🕐 24/7 support + 24-hour refund & replacement policy<br>
-        Trusted by 500,000+ clients since 2014. Built for scraping, AI agents, ad verification, and SEO automation.
     </td>
   </tr>
   <tr>
@@ -261,6 +225,16 @@ Special offer: Use code CAMOUFOX35 to get 35% discount on Proxies.
       Built for teams that need reliable proxy infrastructure without managing devices, servers, or proxy rotation themselves.<br>
       <strong>Special offer for Camoufox users</strong>: Use code <strong>CAMOUFOX20</strong> for <strong>20% off</strong>.<br>
       Start now: <a href="https://proxidize.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=camoufox&utm_content=daijro">https://proxidize.com</a>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="middle">
+      <a href="https://scrappey.com/?utm_source=camoufox&utm_medium=sponsorship&utm_campaign=camoufox_sponsorship" target="_blank">
+        <img width="380" alt="scrappey" src="https://github.com/user-attachments/assets/11b51db9-29c2-4ae9-a568-7466a5941c96"/>
+      </a>
+    </td>
+    <td valign="middle">
+      <a href="https://scrappey.com/?utm_source=camoufox&utm_medium=sponsorship&utm_campaign=camoufox_sponsorship">Scrappey</a> is a Web Scraping API that only charges successful scrapes with pay as you go - no subscriptions. Scrape complex sites. Residential proxies included, no hidden proxy fees, or expiring balances. One API for direct HTTP, full-browser rendering, JavaScript-heavy pages, screenshots, sessions, 30+ browser actions and 200+ concurrent sessions at a time - trusted by 1000+ developers and AI agents. Get 10% off with code CAMOUFOX.
     </td>
   </tr>
 </table>
