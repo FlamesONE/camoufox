@@ -1,6 +1,6 @@
 diff --git a/dom/base/WebRTCIPManager.cpp b/dom/base/WebRTCIPManager.cpp
 new file mode 100644
-index 0000000000..94575f2631
+index 0000000000..8834c93e4b
 --- /dev/null
 +++ b/dom/base/WebRTCIPManager.cpp
 @@ -0,0 +1,146 @@
@@ -152,7 +152,7 @@ index 0000000000..94575f2631
 +} // namespace mozilla
 diff --git a/dom/base/WebRTCIPManager.h b/dom/base/WebRTCIPManager.h
 new file mode 100644
-index 0000000000..c20cb032f6
+index 0000000000..c9810a06d2
 --- /dev/null
 +++ b/dom/base/WebRTCIPManager.h
 @@ -0,0 +1,105 @@
@@ -262,10 +262,10 @@ index 0000000000..c20cb032f6
 +
 +#endif // mozilla_dom_WebRTCIPManager_h
 diff --git a/dom/base/moz.build b/dom/base/moz.build
-index cd9090cda3..93cea20206 100644
+index 23e33db4da..eab9fdc3e8 100644
 --- a/dom/base/moz.build
 +++ b/dom/base/moz.build
-@@ -289,6 +289,7 @@ EXPORTS.mozilla.dom += [
+@@ -297,10 +297,15 @@ EXPORTS.mozilla.dom += [
      "VideoFrameProvider.h",
      "ViewportMetaData.h",
      "VisualViewport.h",
@@ -273,20 +273,19 @@ index cd9090cda3..93cea20206 100644
      "WindowFeatures.h",
      "WindowProxyHolder.h",
  ]
-@@ -326,4 +327,8 @@ SOURCES += [
-     "nsWindowSizes.cpp",
- ]
-
+ 
 +# WebRTCIPManager compiled separately to avoid unified build errors
 +# (it includes RoverfoxStorageManager.h which causes template issues)
 +SOURCES += ["WebRTCIPManager.cpp"]
 +
- UNIFIED_SOURCES += [
+ # AudioFingerprintManager compiled separately to avoid namespace pollution
+ # in unified builds (it includes RoverfoxStorageManager.h which can affect
+ # alphabetically-later files like BarProps.cpp)
 diff --git a/dom/base/nsGlobalWindowInner.cpp b/dom/base/nsGlobalWindowInner.cpp
-index 330a707789..4f87317dbb 100644
+index d4a967ce53..ff932f8528 100644
 --- a/dom/base/nsGlobalWindowInner.cpp
 +++ b/dom/base/nsGlobalWindowInner.cpp
-@@ -323,6 +323,10 @@
+@@ -335,6 +335,10 @@
  #include "xpcprivate.h"
  #include "xpcpublic.h"
  
@@ -297,8 +296,8 @@ index 330a707789..4f87317dbb 100644
  #ifdef NS_PRINTING
  #  include "nsIPrintSettings.h"
  #endif
-@@ -7463,6 +7467,42 @@ IntlUtils* nsGlobalWindowInner::GetIntlUtils(ErrorResult& aError) {
-   return mIntlUtils;
+@@ -7872,6 +7876,42 @@ void nsGlobalWindowInner::SetTimezone(const nsAString& timezone, ErrorResult& aR
+   }
  }
  
 +void nsGlobalWindowInner::SetWebRTCIPv4(const nsAString& ipv4, ErrorResult& aRv) {
@@ -341,12 +340,12 @@ index 330a707789..4f87317dbb 100644
    MOZ_ASSERT(aSharedWorker);
    MOZ_ASSERT(!mSharedWorkers.Contains(aSharedWorker));
 diff --git a/dom/base/nsGlobalWindowInner.h b/dom/base/nsGlobalWindowInner.h
-index 648bcda859..c562b95f87 100644
+index 063843934e..11736cc985 100644
 --- a/dom/base/nsGlobalWindowInner.h
 +++ b/dom/base/nsGlobalWindowInner.h
-@@ -681,6 +681,10 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
- 
-   mozilla::dom::IntlUtils* GetIntlUtils(mozilla::ErrorResult& aRv);
+@@ -691,6 +691,10 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
+   void SetFontSpacingSeed(uint32_t seed, mozilla::ErrorResult& aRv);
+   void SetTimezone(const nsAString& timezone, mozilla::ErrorResult& aRv);
  
 +  // WebRTC IP addresses for privacy-preserving IP spoofing
 +  void SetWebRTCIPv4(const nsAString& ipv4, mozilla::ErrorResult& aRv);
@@ -356,10 +355,10 @@ index 648bcda859..c562b95f87 100644
  
    void ForgetSharedWorker(mozilla::dom::SharedWorker* aSharedWorker);
 diff --git a/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp b/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
-index ca237977cd..abfc081ae7 100644
+index e9afe2cfb2..57a8e1cad8 100644
 --- a/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
 +++ b/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
-@@ -99,6 +99,10 @@
+@@ -98,6 +98,10 @@
  #include "mozilla/glean/DomMediaWebrtcMetrics.h"
  #include "mozilla/net/DataChannelProtocol.h"
  #include "mozilla/net/WebrtcProxyConfig.h"
@@ -370,7 +369,7 @@ index ca237977cd..abfc081ae7 100644
  #include "nsContentUtils.h"
  #include "nsDOMJSUtils.h"
  #include "nsGlobalWindowInner.h"
-@@ -1581,7 +1585,15 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP) {
+@@ -1585,7 +1589,15 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP) {
      }
    };
  
@@ -384,53 +383,57 @@ index ca237977cd..abfc081ae7 100644
 +  }
 +
 +  mLocalRequestedSDP = sanitizedSDP;
-
+ 
    SyncToJsep();
-
-@@ -1760,11 +1772,41 @@ already_AddRefed<dom::Promise> PeerConnectionImpl::GetStats(
+ 
+@@ -1751,11 +1763,44 @@ already_AddRefed<dom::Promise> PeerConnectionImpl::GetStats(
+     MOZ_CRASH("Failed to create a promise!");
    }
  
-   if (!IsClosed()) {
-+    // Camoufox: Capture userContextId for stats sanitization
-+    uint32_t statsUserContextId = 0;
-+    if (mWindow) {
-+      if (BrowsingContext* bc = mWindow->GetBrowsingContext()) {
-+        statsUserContextId = bc->OriginAttributesRef().mUserContextId;
-+      }
++  // Camoufox: Capture userContextId for stats sanitization
++  uint32_t statsUserContextId = 0;
++  if (mWindow) {
++    if (BrowsingContext* bc = mWindow->GetBrowsingContext()) {
++      statsUserContextId = bc->OriginAttributesRef().mUserContextId;
 +    }
-+    bool shouldSanitizeStats = ShouldSpoofCandidateIP();
++  }
++  bool shouldSanitizeStats = ShouldSpoofCandidateIP();
 +
-     GetStats(aSelector, false)
-         ->Then(
-             GetMainThreadSerialEventTarget(), __func__,
--            [promise, window = mWindow](
-+            [promise, window = mWindow, statsUserContextId, shouldSanitizeStats](
-                 UniquePtr<dom::RTCStatsReportInternal>&& aReport) {
-+              // Camoufox: Sanitize IP addresses in stats before exposing to JS
-+              if (shouldSanitizeStats && aReport) {
-+                nsString ipv4, ipv6;
-+                WebRTCIPManager::GetIPv4(statsUserContextId, ipv4);
-+                WebRTCIPManager::GetIPv6(statsUserContextId, ipv6);
-+                NS_ConvertUTF16toUTF8 ipv4Utf8(ipv4);
-+                NS_ConvertUTF16toUTF8 ipv6Utf8(ipv6);
-+                for (auto& candStat : aReport->mIceCandidateStats) {
-+                  if (candStat.mAddress.WasPassed() && !candStat.mAddress.Value().IsEmpty()) {
-+                    nsAutoCString addr;
-+                    addr.Assign(NS_ConvertUTF16toUTF8(candStat.mAddress.Value()));
-+                    // Check for colons AND no periods to avoid IPv4:port false positives
-+                    bool isIPv6 = addr.FindChar(':') != kNotFound && addr.FindChar('.') == kNotFound;
-+                    if (isIPv6 && !ipv6.IsEmpty()) {
-+                      candStat.mAddress.Value() = NS_ConvertUTF8toUTF16(ipv6Utf8);
-+                    } else if (!isIPv6 && !ipv4.IsEmpty()) {
-+                      candStat.mAddress.Value() = NS_ConvertUTF8toUTF16(ipv4Utf8);
-+                    }
+   GetStats(aSelector, false)
+       ->Then(
+           GetMainThreadSerialEventTarget(), __func__,
+-          [promise,
+-           window = mWindow](UniquePtr<dom::RTCStatsReportInternal>&& aReport) {
++          [promise, window = mWindow, statsUserContextId, shouldSanitizeStats](
++              UniquePtr<dom::RTCStatsReportInternal>&& aReport) {
++            // Camoufox: Sanitize IP addresses in stats before exposing to JS
++            if (shouldSanitizeStats && aReport) {
++              nsString ipv4, ipv6;
++              WebRTCIPManager::GetIPv4(statsUserContextId, ipv4);
++              WebRTCIPManager::GetIPv6(statsUserContextId, ipv6);
++              NS_ConvertUTF16toUTF8 ipv4Utf8(ipv4);
++              NS_ConvertUTF16toUTF8 ipv6Utf8(ipv6);
++              for (auto& candStat : aReport->mIceCandidateStats) {
++                if (candStat.mAddress.WasPassed() &&
++                    !candStat.mAddress.Value().IsEmpty()) {
++                  nsAutoCString addr;
++                  addr.Assign(NS_ConvertUTF16toUTF8(candStat.mAddress.Value()));
++                  // Check for colons AND no periods to avoid IPv4:port false
++                  // positives
++                  bool isIPv6 = addr.FindChar(':') != kNotFound &&
++                                addr.FindChar('.') == kNotFound;
++                  if (isIPv6 && !ipv6.IsEmpty()) {
++                    candStat.mAddress.Value() = NS_ConvertUTF8toUTF16(ipv6Utf8);
++                  } else if (!isIPv6 && !ipv4.IsEmpty()) {
++                    candStat.mAddress.Value() = NS_ConvertUTF8toUTF16(ipv4Utf8);
 +                  }
 +                }
 +              }
-               RefPtr<RTCStatsReport> report(new RTCStatsReport(window));
-               report->Incorporate(*aReport);
-               promise->MaybeResolve(std::move(report));
-@@ -3229,12 +3286,22 @@ const std::string& PeerConnectionImpl::GetName() {
++            }
+             RefPtr<RTCStatsReport> report(new RTCStatsReport(window));
+             report->Incorporate(*aReport);
+             promise->MaybeResolve(std::move(report));
+@@ -3274,12 +3319,22 @@ const std::string& PeerConnectionImpl::GetName() {
    return mName;
  }
  
@@ -454,7 +457,7 @@ index ca237977cd..abfc081ae7 100644
    if (mForceIceTcp && std::string::npos != candidate.find(" UDP ")) {
      CSFLogWarn(LOGTAG, "Blocking local UDP candidate: %s", candidate.c_str());
      STAMP_TIMECARD(mTimeCard, "UDP Ice Candidate blocked");
-@@ -3297,10 +3364,197 @@ void PeerConnectionImpl::SendLocalIceCandidateToContent(
+@@ -3342,10 +3397,197 @@ void PeerConnectionImpl::SendLocalIceCandidateToContent(
      uint16_t level, const std::string& mid, const std::string& candidate,
      const std::string& ufrag) {
    STAMP_TIMECARD(mTimeCard, "Send Ice Candidate to content");
@@ -656,7 +659,7 @@ index ca237977cd..abfc081ae7 100644
  }
  
  void PeerConnectionImpl::IceConnectionStateChange(
-@@ -3630,11 +3993,27 @@ void PeerConnectionImpl::UpdateDefaultCandidate(
+@@ -3710,11 +3952,27 @@ void PeerConnectionImpl::UpdateDefaultCandidate(
      const std::string& defaultRtcpAddr, uint16_t defaultRtcpPort,
      const std::string& transportId) {
    CSFLogDebug(LOGTAG, "%s", __FUNCTION__);
@@ -686,7 +689,7 @@ index ca237977cd..abfc081ae7 100644
          transportId);
    }
  }
-@@ -4405,8 +4784,10 @@ bool PeerConnectionImpl::GetPrefDefaultAddressOnly() const {
+@@ -4485,8 +4743,10 @@ bool PeerConnectionImpl::GetPrefDefaultAddressOnly() const {
  
    uint64_t winId = mWindow->WindowID();
  
@@ -700,10 +703,10 @@ index ca237977cd..abfc081ae7 100644
        !MediaManager::Get()->IsActivelyCapturingOrHasAPermission(winId);
    return default_address_only;
 diff --git a/dom/media/webrtc/jsapi/PeerConnectionImpl.h b/dom/media/webrtc/jsapi/PeerConnectionImpl.h
-index 25fc44d757..7902015d73 100644
+index 084a437313..b0b8f6097d 100644
 --- a/dom/media/webrtc/jsapi/PeerConnectionImpl.h
 +++ b/dom/media/webrtc/jsapi/PeerConnectionImpl.h
-@@ -622,8 +622,12 @@ class PeerConnectionImpl final
+@@ -620,8 +620,12 @@ class PeerConnectionImpl final
    RefPtr<MediaPipeline> GetMediaPipelineForTrack(
        dom::MediaStreamTrack& aRecvTrack);
  
@@ -718,7 +721,7 @@ index 25fc44d757..7902015d73 100644
                                        const std::string& candidate,
                                        const std::string& ufrag);
 diff --git a/dom/media/webrtc/jsapi/moz.build b/dom/media/webrtc/jsapi/moz.build
-index 62bb6eecff..da26fe05ee 100644
+index d32e08c2b0..40a750196a 100644
 --- a/dom/media/webrtc/jsapi/moz.build
 +++ b/dom/media/webrtc/jsapi/moz.build
 @@ -68,3 +68,6 @@ EXPORTS.mozilla.dom += [
@@ -729,13 +732,13 @@ index 62bb6eecff..da26fe05ee 100644
 +# DOM Mask
 +LOCAL_INCLUDES += ["/camoucfg"]
 diff --git a/dom/webidl/Window.webidl b/dom/webidl/Window.webidl
-index 7c509eb87e..0a9010c2d1 100644
+index d630148361..a5b0995e4d 100644
 --- a/dom/webidl/Window.webidl
 +++ b/dom/webidl/Window.webidl
-@@ -892,6 +892,17 @@ partial interface Window {
-   readonly attribute VisualViewport visualViewport;
+@@ -976,6 +976,17 @@ partial interface Window {
+   undefined setTimezone(DOMString timezone);
  };
-
+ 
 +// WebRTC IP interfaces for privacy-preserving IP spoofing
 +partial interface Window {
 +  [Throws, Func="mozilla::dom::WebRTCIPManager::IsIPv4FunctionEnabledForWebIDL"]

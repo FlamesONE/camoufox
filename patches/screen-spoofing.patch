@@ -162,10 +162,10 @@ index 0000000000..329f709a60
 +
 +#endif  // mozilla_dom_ScreenDimensionManager_h
 diff --git a/dom/base/moz.build b/dom/base/moz.build
-index 39952f9af8..c471c97936 100644
+index 8e94c6bd70..8787fc79f5 100644
 --- a/dom/base/moz.build
 +++ b/dom/base/moz.build
-@@ -260,6 +260,7 @@ EXPORTS.mozilla.dom += [
+@@ -262,6 +262,7 @@ EXPORTS.mozilla.dom += [
      "ResponsiveImageSelector.h",
      "RoverfoxStorageManager.h",
      "SameProcessMessageQueue.h",
@@ -173,7 +173,7 @@ index 39952f9af8..c471c97936 100644
      "ScreenLuminance.h",
      "ScreenOrientation.h",
      "Selection.h",
-@@ -471,6 +472,7 @@ UNIFIED_SOURCES += [
+@@ -473,6 +474,7 @@ UNIFIED_SOURCES += [
      "ResponsiveImageSelector.cpp",
      "RoverfoxStorageManager.cpp",
      "SameProcessMessageQueue.cpp",
@@ -182,18 +182,18 @@ index 39952f9af8..c471c97936 100644
      "ScreenOrientation.cpp",
      "ScriptableContentIterator.cpp",
 diff --git a/dom/base/nsGlobalWindowInner.cpp b/dom/base/nsGlobalWindowInner.cpp
-index a72b2b478a..babefb850c 100644
+index 5c3d639da9..bab87396cc 100644
 --- a/dom/base/nsGlobalWindowInner.cpp
 +++ b/dom/base/nsGlobalWindowInner.cpp
 @@ -286,6 +286,7 @@
- #include "nsISizeOfEventTarget.h"
  #include "nsISlowScriptDebug.h"
+ #include "nsISupportsPrimitives.h"
  #include "nsISupportsUtils.h"
 +#include "ScreenDimensionManager.h"
  #include "nsIThread.h"
  #include "nsITimedChannel.h"
  #include "nsIURI.h"
-@@ -7706,6 +7707,52 @@ nsISerialEventTarget* nsGlobalWindowInner::SerialEventTarget() const {
+@@ -7727,6 +7728,52 @@ nsISerialEventTarget* nsGlobalWindowInner::SerialEventTarget() const {
    return GetMainThreadSerialEventTarget();
  }
  
@@ -247,10 +247,10 @@ index a72b2b478a..babefb850c 100644
    if (!mPaintWorklet) {
      nsIPrincipal* principal = GetPrincipal();
 diff --git a/dom/base/nsGlobalWindowInner.h b/dom/base/nsGlobalWindowInner.h
-index 9f1ce33fdc..42584898fa 100644
+index 54b50f7bb1..4f807813d1 100644
 --- a/dom/base/nsGlobalWindowInner.h
 +++ b/dom/base/nsGlobalWindowInner.h
-@@ -677,6 +677,10 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
+@@ -679,6 +679,10 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
    // Audio fingerprint seed for per-context audio fingerprinting
    void SetAudioFingerprintSeed(uint32_t seed, mozilla::ErrorResult& aRv);
  
@@ -262,7 +262,7 @@ index 9f1ce33fdc..42584898fa 100644
  
    mozilla::dom::IntlUtils* GetIntlUtils(mozilla::ErrorResult& aRv);
 diff --git a/dom/base/nsScreen.cpp b/dom/base/nsScreen.cpp
-index 8ebb3e575a..f157ff7da8 100644
+index 78849001c5..dc329c8424 100644
 --- a/dom/base/nsScreen.cpp
 +++ b/dom/base/nsScreen.cpp
 @@ -12,6 +12,8 @@
@@ -350,16 +350,19 @@ index 1aa2baa931..4f5479fc2e 100644
    [SameObject, Replaceable]
    readonly attribute VisualViewport visualViewport;
 diff --git a/gfx/src/moz.build b/gfx/src/moz.build
-index d1e1cdf387..54fbb8ad08 100644
+index 91fd96a691..03adf5d674 100644
 --- a/gfx/src/moz.build
 +++ b/gfx/src/moz.build
-@@ -93,3 +93,6 @@ FINAL_LIBRARY = "xul"
- if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+@@ -95,6 +95,9 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
      CXXFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
      CXXFLAGS += CONFIG["MOZ_PANGO_CFLAGS"]
-+
+ 
 +# DOM Mask
 +LOCAL_INCLUDES += ["/camoucfg"]
++
+ if CONFIG["TARGET_CPU"] == "aarch64":
+     DEFINES["USE_NEON"] = True
+     LOCAL_INCLUDES += ["/third_party/xsimd/include"]
 diff --git a/gfx/src/nsDeviceContext.cpp b/gfx/src/nsDeviceContext.cpp
 index 06b86c6c75..9641c8457c 100644
 --- a/gfx/src/nsDeviceContext.cpp
@@ -387,12 +390,12 @@ index 06b86c6c75..9641c8457c 100644
  }
  
 diff --git a/layout/style/nsMediaFeatures.cpp b/layout/style/nsMediaFeatures.cpp
-index 07564ab15b..ae6b70f3b6 100644
+index 5e39014539..fac13c27a7 100644
 --- a/layout/style/nsMediaFeatures.cpp
 +++ b/layout/style/nsMediaFeatures.cpp
 @@ -22,6 +22,8 @@
+ #include "nsContentUtils.h"
  #include "nsDeviceContext.h"
- #include "nsGkAtoms.h"
  #include "nsGlobalWindowOuter.h"
 +#include "nsGlobalWindowInner.h"
 +#include "mozilla/dom/ScreenDimensionManager.h"
