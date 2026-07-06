@@ -57,23 +57,36 @@ have() { command -v "$1" >/dev/null 2>&1; }
 install_rust() {
   if have rustc && have cargo; then
     log "Rust already installed ($(rustc --version))"
-    return
-  fi
-  # cargo may be installed but not on PATH yet in this shell.
-  if [ -f "$HOME/.cargo/env" ]; then
-    # shellcheck disable=SC1091
-    . "$HOME/.cargo/env"
+  else
+    # cargo may be installed but not on PATH yet in this shell.
+    if [ -f "$HOME/.cargo/env" ]; then
+      # shellcheck disable=SC1091
+      . "$HOME/.cargo/env"
+    fi
     if have rustc && have cargo; then
       log "Rust found via ~/.cargo/env ($(rustc --version))"
-      return
+    else
+      log "Installing Rust via rustup..."
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable
+      # shellcheck disable=SC1091
+      . "$HOME/.cargo/env"
+      log "Installed $(rustc --version)"
     fi
   fi
-  log "Installing Rust via rustup..."
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --default-toolchain stable
-  # shellcheck disable=SC1091
-  . "$HOME/.cargo/env"
-  log "Installed $(rustc --version)"
+
+  # Rust cross-compilation targets the build needs. `mach configure` verifies it
+  # can compile Rust for the build target; without the matching std target it
+  # aborts with "Cannot compile for <target>". scripts/patch.py adds the aarch64
+  # and i686 Linux targets but NOT x86_64, so building the Linux x86_64 target
+  # fails without this. `rustup target add` is idempotent (no-op if already
+  # present or if it is the host's native target).
+  if have rustup; then
+    log "Ensuring Rust Linux cross-compile targets (x86_64/aarch64/i686)..."
+    rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu \
+                      i686-unknown-linux-gnu \
+      || warn "Could not add Rust Linux targets; if cross-compiling to Linux, run: rustup target add x86_64-unknown-linux-gnu"
+  fi
 }
 
 # ---------------------------------------------------------------------------
