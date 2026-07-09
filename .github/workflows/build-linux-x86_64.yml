@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y msitools p7zip-full aria2 build-essential make wget unzip rustc
+          sudo apt-get install -y msitools p7zip-full aria2 build-essential make wget unzip rustc ccache
 
       - name: Fetch source
         env:
