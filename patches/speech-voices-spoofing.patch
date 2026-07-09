@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..abcdef1234
 --- /dev/null
 +++ b/dom/base/SpeechVoicesManager.cpp
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,78 @@
 +/* Camoufox: Per-context speech voices manager */
 +#include "SpeechVoicesManager.h"
 +
@@ -74,6 +74,7 @@ index 0000000000..abcdef1234
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(DisabledKeyForUserContext(id), disabled);
 +  return !disabled;

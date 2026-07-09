@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sys
 from os import environ
@@ -303,6 +304,19 @@ def set_into(target: Dict[str, Any], key: str, value: Any) -> None:
         target[key] = value
 
 
+def derive_seed(base: Union[int, str], slot: str) -> int:
+    """
+    Deterministically derive a per-slot 32-bit noise seed from a base seed.
+
+    Stable across processes and platforms (sha256-based, unlike Python's salted
+    ``hash()``), so the same ``base`` always yields the same canvas/audio/font
+    seed — the basis for a reproducible per-profile fingerprint.
+    """
+    digest = hashlib.sha256(f'{base}:{slot}'.encode('utf-8')).digest()
+    # map to [1, 2^32-1]
+    return int.from_bytes(digest[:4], 'big') % 4_294_967_295 + 1
+
+
 def is_domain_set(
     config: Dict[str, Any],
     *properties: str,
@@ -418,6 +432,7 @@ def launch_options(
     window: Optional[Tuple[int, int]] = None,
     fingerprint: Optional[Fingerprint] = None,
     fingerprint_preset: Optional[Union[bool, Dict[str, Any]]] = None,
+    fingerprint_seed: Optional[Union[int, str]] = None,
     ff_version: Optional[int] = None,
     headless: Optional[bool] = None,
     main_world_eval: Optional[bool] = None,
@@ -646,10 +661,18 @@ def launch_options(
         except Exception:
             pass
 
-    # Set random seeds for fingerprint noise (per launch)
-    set_into(config, 'fonts:spacing_seed', randint(1, 4_294_967_295))  # nosec
-    set_into(config, 'audio:seed', randint(1, 4_294_967_295))  # nosec
-    set_into(config, 'canvas:seed', randint(1, 4_294_967_295))  # nosec
+    # Fingerprint noise seeds. If a fingerprint_seed is given, derive them
+    # deterministically so the same seed reproduces the same canvas/audio/font
+    # fingerprint across launches (a stable per-profile identity you control),
+    # instead of a fresh random one each run.
+    if fingerprint_seed is not None:
+        set_into(config, 'fonts:spacing_seed', derive_seed(fingerprint_seed, 'fonts'))
+        set_into(config, 'audio:seed', derive_seed(fingerprint_seed, 'audio'))
+        set_into(config, 'canvas:seed', derive_seed(fingerprint_seed, 'canvas'))
+    else:
+        set_into(config, 'fonts:spacing_seed', randint(1, 4_294_967_295))  # nosec
+        set_into(config, 'audio:seed', randint(1, 4_294_967_295))  # nosec
+        set_into(config, 'canvas:seed', randint(1, 4_294_967_295))  # nosec
 
     # Set geolocation
     if geoip:
@@ -669,6 +692,13 @@ def launch_options(
                 firefox_user_prefs['network.dns.disableIPv6'] = True
             elif valid_ipv6(geoip):
                 set_into(config, 'webrtc:ipv6', geoip)
+
+            # On a dual-stack host the ICE agent can still gather a candidate of
+            # the family we have no mask for (e.g. real IPv6 behind an IPv4
+            # proxy), leaking the true address. When a proxy is in use, force
+            # ICE through it so no direct candidate of any family escapes.
+            if proxy:
+                firefox_user_prefs.setdefault('media.peerconnection.ice.proxy_only', True)
 
         geolocation = get_geolocation(geoip, geoip_db=geoip_db)
         geo_config = geolocation.as_config()

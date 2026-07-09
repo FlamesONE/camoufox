@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..37a1713159
 --- /dev/null
 +++ b/dom/base/NavigatorManager.cpp
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,82 @@
 +/* Camoufox: Per-context navigator property manager */
 +#include "NavigatorManager.h"
 +
@@ -41,6 +41,7 @@ index 0000000000..37a1713159
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  return !IsDisabled("nav_plat", id);
 +}
 +
@@ -53,6 +54,7 @@ index 0000000000..37a1713159
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  return !IsDisabled("nav_oscpu", id);
 +}
 +
@@ -65,6 +67,7 @@ index 0000000000..37a1713159
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  return !IsDisabled("nav_hwc", id);
 +}
 +
@@ -77,6 +80,7 @@ index 0000000000..37a1713159
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  return !IsDisabled("nav_ua", id);
 +}
 +
