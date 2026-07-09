@@ -53,7 +53,9 @@ jobs:
 
       - name: Setup and bootstrap
         run: |
-          make setup-minimal
+          # setup (not setup-minimal): git init + unpatched tag required —
+          # multibuild's make set-target runs `git clean -fdx && git reset --hard unpatched`.
+          make setup
           make mozbootstrap
           mkdir -p dist
 
