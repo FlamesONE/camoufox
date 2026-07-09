@@ -55,6 +55,8 @@ jobs:
         run: |
           # setup (not setup-minimal): git init + unpatched tag required —
           # multibuild's make set-target runs `git clean -fdx && git reset --hard unpatched`.
+          git config --global user.email "ci@camoufox.local"
+          git config --global user.name "camoufox-ci"
           make setup
           make mozbootstrap
           mkdir -p dist
