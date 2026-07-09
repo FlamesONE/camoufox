@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..e07de3e753
 --- /dev/null
 +++ b/dom/base/FontSpacingSeedManager.cpp
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,92 @@
 +#include "FontSpacingSeedManager.h"
 +#include "nsPrintfCString.h"
 +#include "MaskConfig.hpp"
@@ -88,6 +88,7 @@ index 0000000000..e07de3e753
 +    userContextId = bc->OriginAttributesRef().mUserContextId;
 +  }
 +
++  if (userContextId == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(DisabledKeyForUserContext(userContextId), disabled);
 +  return !disabled;

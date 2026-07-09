@@ -82,9 +82,17 @@ _ESSENTIAL_FONTS_LINUX = [
 
 def _generate_random_font_subset(target_os: str) -> List[str]:
     """
-    Generate a random subset of fonts for the given OS.
-    Picks a random percentage between 30-78% of non-essential fonts,
-    always includes essential + marker fonts.
+    Generate a plausible font list for the given OS.
+
+    Real machines of one OS differ only by a handful of optional/app-installed
+    fonts (Office, Adobe, language packs) — not by 70% of the list. Dropping a
+    large fraction produces a set that matches no real install and *raises*
+    uniqueness, the opposite of the goal. So retain 85-100% of the list:
+    enough variance to break cross-profile linking, close enough to a real OS
+    install to stay believable. Essential + marker fonts are always included.
+
+    ponytail: high-retention heuristic; the real ceiling is sampling whole
+    font sets captured from real machines rather than dropping from one list.
     """
     os_fonts_data = _load_os_fonts()
     os_key = {'macos': 'mac', 'windows': 'win', 'linux': 'lin'}.get(target_os, 'mac')
@@ -104,8 +112,8 @@ def _generate_random_font_subset(target_os: str) -> List[str]:
     result = [f for f in full_list if f in essential]
     non_essential = [f for f in full_list if f not in essential]
 
-    # Random percentage between 30-78%
-    pct = 30 + int(random() * 49)
+    # Retain 85-100% of non-essential fonts (see docstring).
+    pct = 85 + int(random() * 16)
     count = round((pct / 100) * len(non_essential))
 
     # Randomly select non-essential fonts
@@ -155,7 +163,9 @@ _ESSENTIAL_VOICES_WINDOWS = [
 def _generate_random_voice_subset(target_os: str) -> List[str]:
     """
     Generate a random subset of speech voices for the given OS.
-    macOS: random 40-80% of non-essential + essential always included.
+    macOS: retain 70-100% of non-essential + essential always included
+    (extra macOS voices are optional downloads, so more variance is realistic
+    here than for fonts, but heavy dropping still looks unreal).
     Windows: all voices (too few to subset meaningfully).
     Linux: empty list (no native speech voices).
     """
@@ -175,7 +185,7 @@ def _generate_random_voice_subset(target_os: str) -> List[str]:
     result = [v for v in full_list if v in essential]
     non_essential = [v for v in full_list if v not in essential]
 
-    pct = 40 + int(random() * 41)  # 40-80%
+    pct = 70 + int(random() * 31)  # 70-100%
     count = round((pct / 100) * len(non_essential))
 
     if count < len(non_essential):
@@ -415,6 +425,13 @@ def _build_init_script(values: Dict[str, Any]) -> str:
         lines.append(
             '  if (typeof w.setWebRTCIPv4 === "function") w.setWebRTCIPv4("");'
         )
+    # Seal the IPv6 setter too (empty = no IPv6 ICE candidate). Unlike the
+    # others it takes no value, so it's never called above and — since deleting
+    # a [Func]-guarded WebIDL op doesn't stick while the guard stays true — it
+    # would otherwise linger on window as the last enumerable set* tell.
+    lines.append(
+        '  if (typeof w.setWebRTCIPv6 === "function") w.setWebRTCIPv6("");'
+    )
 
     # Font list (comma-separated)
     font_list = values.get('fontList')
@@ -431,6 +448,23 @@ def _build_init_script(values: Dict[str, Any]) -> str:
         lines.append(
             f'  if (typeof w.setSpeechVoices === "function") w.setSpeechVoices({_json.dumps(joined)});'
         )
+
+    # Delete every per-context setter, whether or not it was called above. Each
+    # one self-destructs on use, but a setter whose value was None is never
+    # called and would otherwise linger on `window` forever — a trivial,
+    # page-visible Camoufox signature (typeof window.setNavigatorPlatform ===
+    # "function"). Removing them all leaves nothing for a detector to enumerate;
+    # the spoofed values are unaffected (already applied, or served by the
+    # native CAMOU_CONFIG getters).
+    all_setters = [
+        'setFontSpacingSeed', 'setAudioFingerprintSeed', 'setCanvasSeed',
+        'setNavigatorPlatform', 'setNavigatorOscpu', 'setNavigatorUserAgent',
+        'setNavigatorHardwareConcurrency', 'setWebGLVendor', 'setWebGLRenderer',
+        'setScreenDimensions', 'setScreenColorDepth', 'setTimezone',
+        'setWebRTCIPv4', 'setFontList', 'setSpeechVoices',
+    ]
+    lines.append(f'  var _s = {_json.dumps(all_setters)};')
+    lines.append('  for (var i = 0; i < _s.length; i++) { try { delete w[_s[i]]; } catch (e) {} }')
 
     lines.append('})();')
     return '\n'.join(lines)
@@ -626,6 +660,16 @@ class ExtendedScreen(ScreenFingerprint):
     screenY: Optional[int] = None
 
 
+# Camoufox property names that legitimately carry a Firefox version token.
+_VERSION_FIELD_TOKENS = ('useragent', 'appversion', 'oscpu', 'buildid', 'platformversion')
+
+
+def _is_version_field(type_key: str) -> bool:
+    """Whether a camoufox property name is one where a Firefox version belongs."""
+    key = type_key.lower()
+    return any(tok in key for tok in _VERSION_FIELD_TOKENS)
+
+
 def _cast_to_properties(
     camoufox_data: Dict[str, Any],
     cast_enum: Dict[str, Any],
@@ -650,8 +694,10 @@ def _cast_to_properties(
         # Fix values that are out of bounds
         if type_key.startswith("screen.") and isinstance(data, int) and data < 0:
             data = 0
-        # Replace the Firefox versions with ff_version
-        if ff_version and isinstance(data, str):
+        # Replace the Firefox major version with ff_version — but ONLY in
+        # version-bearing fields. A blanket rewrite corrupts unrelated strings
+        # like a WebGL renderer "GeForce GTX 150.0".
+        if ff_version and isinstance(data, str) and _is_version_field(type_key):
             data = re.sub(r'(?<!\d)(1[0-9]{2})(\.0)(?!\d)', rf'{ff_version}\2', data)
         camoufox_data[type_key] = data
 

@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..4f1ff23af4
 --- /dev/null
 +++ b/dom/base/WebGLParamsManager.cpp
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,84 @@
 +/* Camoufox: Per-context WebGL parameter manager */
 +#include "WebGLParamsManager.h"
 +
@@ -66,6 +66,7 @@ index 0000000000..4f1ff23af4
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(VendorDisabledKey(id), disabled);
 +  return !disabled;
@@ -79,6 +80,7 @@ index 0000000000..4f1ff23af4
 +  if (BrowsingContext* bc = win->GetBrowsingContext()) {
 +    id = bc->OriginAttributesRef().mUserContextId;
 +  }
++  if (id == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(RendererDisabledKey(id), disabled);
 +  return !disabled;
@@ -223,7 +225,7 @@ index 0db8833f47..063843934e 100644
    void Alert(nsIPrincipal& aSubjectPrincipal, mozilla::ErrorResult& aError);
    void Alert(const nsAString& aMessage, nsIPrincipal& aSubjectPrincipal,
 diff --git a/dom/canvas/ClientWebGLContext.cpp b/dom/canvas/ClientWebGLContext.cpp
-index aee042ab75..54b5638d19 100644
+index aee042a..c99526d 100644
 --- a/dom/canvas/ClientWebGLContext.cpp
 +++ b/dom/canvas/ClientWebGLContext.cpp
 @@ -3,6 +3,14 @@
@@ -241,7 +243,42 @@ index aee042ab75..54b5638d19 100644
  
  #include <fmt/format.h>
  
-@@ -759,6 +767,35 @@ void ClientWebGLContext::SetUnpackColorSpace(
+@@ -48,6 +56,34 @@
+ 
+ namespace mozilla {
+ 
++// Camoufox: optional, opt-in seeded perturbation of WebGL pixel readback.
++// Off by default -- Firefox's own RFP randomization is intentionally left
++// disabled because its uniform pattern is itself detectable. When a stable
++// "webgl:readbackSeed" is configured, flip the least-significant bit of a
++// sparse (~1/64), session-stable set of colour samples so a known-shader
++// readback cannot reliably identify the host GPU across sessions, while
++// staying far subtler than full-range randomization. Alpha is left untouched.
++static void MaybePerturbWebGLReadback(uint8_t* aData, size_t aSizeBytes,
++                                      uint32_t aElementsPerPixel,
++                                      uint32_t aBytesPerElement, bool aHasAlpha) {
++  if (aBytesPerElement != 1 || aElementsPerPixel == 0 || !aData) return;
++  auto seedOpt = MaskConfig::GetUint32("webgl:readbackSeed");
++  if (!seedOpt) return;
++  const uint32_t seed = *seedOpt;
++  const size_t stride = aElementsPerPixel;  // bytesPerElement == 1
++  const uint32_t colorChannels =
++      aHasAlpha ? aElementsPerPixel - 1 : aElementsPerPixel;
++  if (colorChannels == 0 || aSizeBytes < stride) return;
++  const size_t nPixels = aSizeBytes / stride;
++  for (size_t p = 0; p < nPixels; ++p) {
++    uint32_t h = seed ^ static_cast<uint32_t>((p * 2654435761u) & 0xffffffffu);
++    h ^= h >> 15;
++    if ((h & 0x3Fu) != 0u) continue;
++    const uint32_t ch = (h >> 6) % colorChannels;
++    aData[p * stride + ch] ^= 1u;
++  }
++}
++
+ namespace webgl {
+ std::string SanitizeRenderer(const std::string&);
+ std::string SanitizeVendor(const std::string&);
+@@ -759,6 +795,35 @@ void ClientWebGLContext::SetUnpackColorSpace(
    Run<RPROC(SetUnpackColorSpace)>(*mUnpackColorSpace);
  }
  
@@ -277,7 +314,7 @@ index aee042ab75..54b5638d19 100644
  void ClientWebGLContext::GetContextAttributes(
      dom::Nullable<dom::WebGLContextAttributes>& retval) {
    retval.SetNull();
-@@ -769,15 +806,40 @@ void ClientWebGLContext::GetContextAttributes(
+@@ -769,15 +834,40 @@ void ClientWebGLContext::GetContextAttributes(
  
    const auto& options = mNotLost->info.options;
  
@@ -327,7 +364,7 @@ index aee042ab75..54b5638d19 100644
  }
  
  // -----------------------
-@@ -974,18 +1036,28 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
+@@ -974,18 +1064,28 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
  std::unordered_map<GLenum, bool> webgl::MakeIsEnabledMap(const bool webgl2) {
    auto ret = std::unordered_map<GLenum, bool>{};
  
@@ -366,7 +403,17 @@ index aee042ab75..54b5638d19 100644
    }
  
    return ret;
-@@ -2027,6 +2099,57 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -1262,6 +1362,9 @@ RefPtr<gfx::DataSourceSurface> ClientWebGLContext::BackBufferSnapshot() {
+     const auto pixels = Span<uint8_t>(map.GetData(), stride * size.y);
+     if (!DoReadPixels(desc, pixels)) return nullptr;
+ 
++    // Camoufox: opt-in readback perturbation (surface is R8G8B8A8).
++    MaybePerturbWebGLReadback(pixels.data(), pixels.size(), 4, 1, true);
++
+     // RGBA->BGRA and flip-y.
+     MOZ_RELEASE_ASSERT(gfx::SwizzleYFlipData(
+         pixels.data(), stride, gfx::SurfaceFormat::R8G8B8A8, pixels.data(),
+@@ -2027,6 +2130,57 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
    const auto& state = State();
  
    // -
@@ -424,7 +471,7 @@ index aee042ab75..54b5638d19 100644
  
    const auto fnSetRetval_Buffer = [&](const GLenum target) {
      const auto buffer = *MaybeFind(state.mBoundBufferByTarget, target);
-@@ -2132,49 +2255,84 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2132,49 +2286,84 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
  
      // 2 floats
      case LOCAL_GL_DEPTH_RANGE:
@@ -522,7 +569,7 @@ index aee042ab75..54b5638d19 100644
        return;
    }
  
-@@ -2355,6 +2513,17 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2355,6 +2544,17 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
  
          switch (pname) {
            case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_RENDERER_WEBGL:
@@ -540,7 +587,7 @@ index aee042ab75..54b5638d19 100644
              if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo) ||
                  ShouldResistFingerprinting(RFPTarget::WebGLRendererConstant)) {
                ret = Some("Mozilla"_ns);
-@@ -2367,6 +2536,17 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2367,6 +2567,17 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
              break;
  
            case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_VENDOR_WEBGL:
@@ -558,7 +605,7 @@ index aee042ab75..54b5638d19 100644
              if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo)) {
                ret = Some("Mozilla"_ns);
              } else if (ShouldResistFingerprinting(
-@@ -2478,7 +2658,9 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2478,7 +2689,9 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
          case LOCAL_GL_COLOR_WRITEMASK: {
            const auto mask = uint8_t(*maybe);
            const auto bs = std::bitset<4>(mask);
@@ -569,7 +616,7 @@ index aee042ab75..54b5638d19 100644
            JS::Rooted<JS::Value> arr(cx);
            if (!dom::ToJSValue(cx, src.data(), src.size(), &arr)) {
              rv = NS_ERROR_OUT_OF_MEMORY;
-@@ -2871,6 +3053,24 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
+@@ -2871,6 +3084,24 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
    const FuncScope funcScope(*this, "getShaderPrecisionFormat");
    if (IsContextLost()) return nullptr;
  
@@ -594,7 +641,23 @@ index aee042ab75..54b5638d19 100644
    const auto& shaderPrecisions = *notLost->info.shaderPrecisions;
    const auto args =
        webgl::GetShaderPrecisionFormatArgs{shadertype, precisiontype};
-@@ -5948,6 +6148,17 @@ bool ClientWebGLContext::IsSupported(const WebGLExtensionID ext,
+@@ -5209,6 +5440,15 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+                                             state.mPixelPackState};
+     bool succeeded = DoReadPixels(desc, *range);
+     if (succeeded) {
++      // Camoufox: opt-in readback perturbation (independent of RFP mode).
++      if (const auto pii = webgl::PackingInfoInfo::For(desc.pi); pii.isSome()) {
++        const bool cfHasAlpha =
++            format == LOCAL_GL_SRGB_ALPHA || format == LOCAL_GL_RGBA ||
++            format == LOCAL_GL_BGRA || format == LOCAL_GL_LUMINANCE_ALPHA;
++        MaybePerturbWebGLReadback(range->data(), range->size_bytes(),
++                                  pii->elementsPerPixel, pii->bytesPerElement,
++                                  cfHasAlpha);
++      }
+       CanvasUtils::ImageExtraction extraction =
+           ImageExtractionResult(mCanvasElement, mOffscreenCanvas);
+ 
+@@ -5948,6 +6188,17 @@ bool ClientWebGLContext::IsSupported(const WebGLExtensionID ext,
      return false;
    }
  
@@ -612,7 +675,7 @@ index aee042ab75..54b5638d19 100644
    const auto& limits = Limits();
    return limits.supportedExtensions[ext];
  }
-@@ -5959,6 +6170,18 @@ void ClientWebGLContext::GetSupportedExtensions(
+@@ -5959,6 +6210,18 @@ void ClientWebGLContext::GetSupportedExtensions(
    if (IsContextLost()) return;
  
    auto& retarr = retval.SetValue();

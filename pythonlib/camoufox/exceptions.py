@@ -194,3 +194,11 @@ class CamoufoxNotInstalled(FileNotFoundError):
     """
 
     ...
+
+
+class IntegrityError(Exception):
+    """
+    Raised when a downloaded file fails its sha256 integrity check.
+    """
+
+    ...

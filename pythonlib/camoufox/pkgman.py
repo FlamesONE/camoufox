@@ -1,3 +1,4 @@
+import hashlib
 import os
 import platform
 import re
@@ -31,6 +32,7 @@ from yaml import CLoader, load
 from .__version__ import CONSTRAINTS
 from .exceptions import (
     CamoufoxNotInstalled,
+    IntegrityError,
     MissingRelease,
     UnsupportedArchitecture,
     UnsupportedOS,
@@ -850,6 +852,36 @@ def webdl(
 
     buffer.seek(0)
     return buffer
+
+
+def verify_file_sha256(buffer: DownloadBuffer, expected: Optional[str]) -> None:
+    """
+    Verify a downloaded buffer against an expected sha256 hex digest.
+
+    Aborts hard on mismatch (tampered/corrupt download). When ``expected`` is
+    unknown (older releases carry no digest), warns loudly instead of failing —
+    we cannot verify what the source never published.
+    """
+    buffer.seek(0)
+    digest = hashlib.sha256()
+    for chunk in iter(lambda: buffer.read(1 << 20), b''):
+        digest.update(chunk)
+    buffer.seek(0)
+    actual = digest.hexdigest()
+
+    if not expected:
+        rprint(
+            "WARNING: no sha256 published for this asset; skipping integrity "
+            f"check (got {actual[:8]}).",
+            fg="yellow",
+        )
+        return
+
+    if actual.lower() != expected.lower():
+        raise IntegrityError(
+            f"sha256 mismatch: expected {expected}, got {actual}. "
+            "Refusing to install a tampered or corrupt download."
+        )
 
 
 def unzip(

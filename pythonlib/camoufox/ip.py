@@ -1,12 +1,10 @@
+import ipaddress
 import re
-import warnings
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Dict, Optional, Tuple
 
 import requests
-from urllib3.exceptions import InsecureRequestWarning
 
 from .exceptions import InvalidIP, InvalidProxy
 
@@ -65,24 +63,23 @@ class Proxy:
 
 @lru_cache(128, typed=True)
 def valid_ipv4(ip: str) -> bool:
-    return bool(re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', ip))
+    try:
+        return isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)
+    except ValueError:
+        return False
 
 
 @lru_cache(128, typed=True)
 def valid_ipv6(ip: str) -> bool:
-    return bool(re.match(r'^(([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4})$', ip))
+    try:
+        return isinstance(ipaddress.ip_address(ip), ipaddress.IPv6Address)
+    except ValueError:
+        return False
 
 
 def validate_ip(ip: str) -> None:
     if not valid_ipv4(ip) and not valid_ipv6(ip):
         raise InvalidIP(f"Invalid IP address: {ip}")
-
-
-@contextmanager
-def _suppress_insecure_warning():
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=InsecureRequestWarning)
-        yield
 
 
 @lru_cache(maxsize=None)
@@ -104,13 +101,14 @@ def public_ip(proxy: Optional[str] = None) -> str:
     end_exception = None
     for url in URLS:
         try:
-            with _suppress_insecure_warning():
-                resp = requests.get(  # nosec
-                    url,
-                    proxies=Proxy.as_requests_proxy(proxy) if proxy else None,
-                    timeout=5,
-                    verify=False,
-                )
+            # verify=True: a hostile/MITM proxy must not be able to forge the
+            # exit IP, or the whole geo/tz/locale fingerprint desyncs from reality.
+            resp = requests.get(
+                url,
+                proxies=Proxy.as_requests_proxy(proxy) if proxy else None,
+                timeout=5,
+                verify=True,
+            )
             resp.raise_for_status()
             ip = resp.text.strip()
             validate_ip(ip)

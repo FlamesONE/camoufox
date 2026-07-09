@@ -2,6 +2,8 @@
 Helpers to fetch geolocation, timezone, and locale data given an IP
 """
 
+import math
+import random
 import shutil
 import tempfile
 from pathlib import Path
@@ -222,6 +224,31 @@ def needs_update(config: Optional[Dict] = None) -> bool:
     return age > timedelta(days=update_days)
 
 
+# Fallback accuracy (km) when the GeoIP database exposes no accuracy_radius.
+# City-level IP geolocation is realistically imprecise; a proxied client
+# legitimately reports a coarse radius, so this stays coherent.
+_DEFAULT_ACCURACY_KM = 20.0
+
+
+def _jitter_coords(
+    latitude: float, longitude: float, accuracy_km: float
+) -> Tuple[float, float]:
+    """
+    Offset coordinates by a random point inside a small circle so that every
+    client behind the same IP does not report the identical city centroid
+    (a classic GeoIP-derived tell). The offset stays within the reported
+    accuracy, capped so we never wander out of the locality.
+    """
+    radius_km = min(accuracy_km, 5.0)
+    # Uniform point in a disc: sqrt for area-uniformity.
+    r = radius_km * math.sqrt(random.random())
+    theta = random.uniform(0, 2 * math.pi)
+    dlat = (r * math.cos(theta)) / 111.0
+    coslat = math.cos(math.radians(latitude)) or 1e-6
+    dlon = (r * math.sin(theta)) / (111.0 * coslat)
+    return round(latitude + dlat, 6), round(longitude + dlon, 6)
+
+
 def get_geolocation(ip: str, geoip_db: Optional[str] = None) -> Geolocation:
     """
     Gets the geolocation for an IP address
@@ -253,12 +280,22 @@ def get_geolocation(ip: str, geoip_db: Optional[str] = None) -> Geolocation:
         latitude = _find_in(resp, paths['latitude'])
         timezone = _find_in(resp, paths['timezone'])
 
+        accuracy_radius = None
+        if paths.get('accuracy_radius'):
+            accuracy_radius = _find_in(resp, paths['accuracy_radius'])
+        accuracy_km = float(accuracy_radius) if accuracy_radius else _DEFAULT_ACCURACY_KM
+
+        latitude, longitude = _jitter_coords(
+            float(latitude), float(longitude), accuracy_km
+        )
+
         iso_code = str(iso_code).upper()
         locale = SELECTOR.from_region(iso_code)
 
         return Geolocation(
             locale=locale,
-            longitude=float(longitude),
-            latitude=float(latitude),
+            longitude=longitude,
+            latitude=latitude,
             timezone=str(timezone),
+            accuracy=round(accuracy_km * 1000, 1),
         )

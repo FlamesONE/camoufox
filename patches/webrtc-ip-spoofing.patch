@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..8834c93e4b
 --- /dev/null
 +++ b/dom/base/WebRTCIPManager.cpp
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,148 @@
 +#include "WebRTCIPManager.h"
 +#include "nsTHashMap.h"
 +#include "RoverfoxStorageManager.h"
@@ -124,6 +124,7 @@ index 0000000000..8834c93e4b
 +    userContextId = bc->OriginAttributesRef().mUserContextId;
 +  }
 +
++  if (userContextId == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(IPv4DisabledKeyForUserContext(userContextId), disabled);
 +  return !disabled;
@@ -141,6 +142,7 @@ index 0000000000..8834c93e4b
 +    userContextId = bc->OriginAttributesRef().mUserContextId;
 +  }
 +
++  if (userContextId == 0) return false;  // default ctx: served via global config; no per-context setter tell
 +  bool disabled = false;
 +  RoverfoxStorageManager::GetBool(IPv6DisabledKeyForUserContext(userContextId), disabled);
 +  return !disabled;

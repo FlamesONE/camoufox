@@ -54,6 +54,7 @@ geoip:
       longitude: longitude
       latitude: latitude
       timezone: timezone
+      accuracy_radius: accuracy_radius
 
   # GeoIP All-in-One - Combined IPv4/IPv6 with all fields
   - name: GeoIP AIO by daijro
@@ -66,3 +67,4 @@ geoip:
       longitude: location.longitude
       latitude: location.latitude
       timezone: location.time_zone
+      accuracy_radius: location.accuracy_radius

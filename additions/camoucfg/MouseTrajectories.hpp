@@ -14,16 +14,18 @@
 
 class BezierCalculator {
  public:
-  static long long factorial(int n) {
-    if (n < 0) return -1;  // Indicate error
-    long long result = 1;
-    for (int i = 2; i <= n; i++) result *= i;
-    return result;
-  }
-
+  // Multiplicative binomial coefficient. Avoids the factorial() intermediate,
+  // which overflows long long at n >= 21 (a latent trap if the knot count is
+  // ever raised); this form stays exact for the small n used here and never
+  // overflows for realistic control-point counts.
   static double binomial(int n, int k) {
-    return static_cast<double>(factorial(n)) /
-           (factorial(k) * factorial(n - k));
+    if (k < 0 || k > n) return 0.0;
+    k = std::min(k, n - k);
+    double result = 1.0;
+    for (int i = 0; i < k; i++) {
+      result = result * (n - i) / (i + 1);
+    }
+    return result;
   }
 
   static double bernsteinPolynomialPoint(double x, int i, int n) {
@@ -91,13 +93,17 @@ class HumanizeMouseTrajectory {
 
     std::vector<std::vector<double>> curvePoints =
         generatePoints(internalKnots);
-    curvePoints = distortPoints(curvePoints, 1.0, 1.0, 0.5);
+    // Zero-mean jitter: symmetric noise on both axes, no directional bias.
+    curvePoints = distortPoints(curvePoints, 0.0, 1.5, 0.5);
     points = tweenPoints(curvePoints);
   }
 
-  double easeOutQuad(double n) const {
+  // Accelerate-then-decelerate. Real pointer motion has a bell-shaped velocity
+  // profile (peak speed mid-flight); a monotonic decelerate-only ease is a
+  // movement-entropy tell that velocity/jerk detectors model.
+  double easeInOutQuad(double n) const {
     assert(n >= 0.0 && n <= 1.0 && "Argument must be between 0.0 and 1.0.");
-    return -n * (n - 2);
+    return n < 0.5 ? 2.0 * n * n : 1.0 - std::pow(-2.0 * n + 2.0, 2.0) / 2.0;
   }
 
   std::vector<std::pair<double, double>> generateInternalKnots(
@@ -162,14 +168,22 @@ class HumanizeMouseTrajectory {
                                                 distortionStDev);
     std::uniform_real_distribution<double> uniformDist(0.0, 1.0);
 
+    const double n = static_cast<double>(points.size() - 1);
     for (size_t i = 1; i < points.size() - 1; i++) {
       double x = points[i][0];
       double y = points[i][1];
-      double delta = 0.0;
+      double deltaX = 0.0;
+      double deltaY = 0.0;
       if (uniformDist(randomEngine) < distortionFrequency) {
-        delta = std::round(normalDist(randomEngine));
+        // Sinusoidal envelope: max wobble mid-flight, ~zero at both ends.
+        // A real hand is precise when leaving the origin and arriving at the
+        // target; constant-amplitude noise along the whole path is a tell.
+        constexpr double kPi = 3.14159265358979323846;
+        double envelope = std::sin(kPi * static_cast<double>(i) / n);
+        deltaX = std::round(normalDist(randomEngine) * envelope);
+        deltaY = std::round(normalDist(randomEngine) * envelope);
       }
-      distorted.push_back({x, y + delta});
+      distorted.push_back({x + deltaX, y + deltaY});
     }
     distorted.push_back(points.back());
     return distorted;
@@ -208,9 +222,18 @@ class HumanizeMouseTrajectory {
     std::vector<std::vector<double>> res;
     for (int i = 0; i < targetPoints; i++) {
       double t = static_cast<double>(i) / (targetPoints - 1);
-      double easedT = easeOutQuad(t);
-      int index = static_cast<int>(easedT * (points.size() - 1));
-      res.push_back(points[index]);
+      double easedT = easeInOutQuad(t);
+      // Interpolate between adjacent curve points instead of snapping to an
+      // integer index. Snapping repeats indices -> duplicate, zero-velocity
+      // samples (robotic); interpolation yields the smooth, continuously
+      // varying velocity the easing curve actually describes.
+      double pos = easedT * (points.size() - 1);
+      int idx = static_cast<int>(pos);
+      int nxt = std::min(idx + 1, static_cast<int>(points.size()) - 1);
+      double frac = pos - idx;
+      double px = points[idx][0] + (points[nxt][0] - points[idx][0]) * frac;
+      double py = points[idx][1] + (points[nxt][1] - points[idx][1]) * frac;
+      res.push_back({px, py});
     }
     return res;
   }
