@@ -69,8 +69,22 @@ jobs:
           sudo swapon /swapfile
           free -h
 
+      - name: Free disk before compile
+        run: |
+          # Firefox cold build needs ~40GB free; runners fill during bootstrap.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" \
+            /usr/share/swift /usr/local/.ghcup 2>/dev/null || true
+          sudo apt-get clean
+          docker system prune -af 2>/dev/null || true
+          df -h /
+
       - name: Build linux x86_64
         run: python3 ./multibuild.py --target linux --arch x86_64
+        env:
+          # Keep object cache off-disk-pressure path small
+          CCACHE_MAXSIZE: 2G
+          CCACHE_COMPRESS: 1
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
